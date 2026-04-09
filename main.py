@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,12 +7,47 @@ from urllib.parse import unquote
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
+import os
 
 from config import BOT_TOKEN, PLANS, ADMIN_IDS, OWNER_ID, WEBAPP_URL
 import database as db
-from bot import dp, bot
 
-app = FastAPI(title="LiliumVPN API")
+# Импортируем только роутер, а не готовые bot/dp
+from bot import router, check_channel_subscription, main_menu_kb
+
+from aiogram import Bot, Dispatcher, types
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import Update
+
+# ─── Lifespan (вместо @app.on_event) ─────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await db.init_db()
+    # Создаём bot и dp внутри lifespan, чтобы не было конфликтов
+    bot = Bot(token=BOT_TOKEN)
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
+    dp.include_router(router)
+    
+    # Устанавливаем webhook, если указан
+    webhook_url = os.getenv("WEBHOOK_URL")
+    if webhook_url:
+        await bot.set_webhook(f"{webhook_url}/webhook")
+        print(f"✅ Webhook set to {webhook_url}/webhook")
+    
+    # Сохраняем в app.state для использования в эндпоинтах
+    app.state.bot = bot
+    app.state.dp = dp
+    
+    yield
+    
+    # Shutdown
+    await bot.session.close()
+    await db.close()
+
+app = FastAPI(title="LiliumVPN API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,12 +56,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ─── Startup ─────────────────────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def startup():
-    await db.init_db()
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +98,8 @@ async def get_current_user(request: Request) -> dict:
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
-    from aiogram.types import Update
+    bot = request.app.state.bot
+    dp = request.app.state.dp
     data = await request.json()
     update = Update(**data)
     await dp.feed_update(bot, update)
@@ -234,6 +265,7 @@ class BroadcastRequest(BaseModel):
 
 @app.post("/api/admin/broadcast")
 async def broadcast(body: BroadcastRequest, user=Depends(require_owner)):
+    bot = app.state.bot
     users = await db.admin_broadcast_get_users()
     sent, failed = 0, 0
     for uid in users:
