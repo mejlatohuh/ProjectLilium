@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: liliumvpn
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BOT_TOKEN
+        value: 8520036141:AAEBBQykxyyucFm3J-6c0XlY5lNeGqRgm_g
+      - key: WEBHOOK_URL
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CHANNEL_ID
+        value: "@ProjectLilium"
+      - key: CKASSA_SHOP_ID
+        sync: false
+      - key: CKASSA_SECRET
+        sync: false
+      - key: CRYPTOBOT_TOKEN
+        sync: false
