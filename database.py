@@ -7,6 +7,7 @@ import string
 import random
 
 pool = None
+ssl="require"
 
 async def get_pool():
     global pool
@@ -242,5 +243,4 @@ async def create_promo(code: str, discount_rub: float, uses: int = None):
             "INSERT INTO promo_codes (code, discount_rub, uses_left, active, created_at) VALUES ($1,$2,$3,true,NOW())",
             code.upper(), discount_rub, uses
         )
-
-ssl="require"
+        
