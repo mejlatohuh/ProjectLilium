@@ -245,9 +245,12 @@ async def select_plan(call: CallbackQuery):
     builder.button(text="◀️ Назад", callback_data="buy")
     builder.adjust(1)
 
+    # Исправлено: вынесли сложное выражение в переменную
+    traffic_text = 'Безлимит' if plan['traffic_gb'] == -1 else f"{plan['traffic_gb']} ГБ/мес"
+
     await call.message.edit_text(
         f"📦 *{plan['name']}*\n\n"
-        f"📊 Трафик: {'Безлимит' if plan['traffic_gb']==-1 else f\"{plan['traffic_gb']} ГБ/мес\"}\n"
+        f"📊 Трафик: {traffic_text}\n"
         f"🖥 Устройств: {plan['devices']}\n"
         f"📅 Срок: {plan['days']} дней\n\n"
         f"Выбери способ оплаты:",
@@ -263,9 +266,13 @@ async def pay_stars(call: CallbackQuery):
     plan = PLANS.get(plan_key)
     if not plan:
         return
+    
+    # Исправлено: вынесли сложное выражение в переменную
+    traffic_short = 'Безлимит' if plan['traffic_gb'] == -1 else f"{plan['traffic_gb']} ГБ"
+    
     await call.message.answer_invoice(
         title=f"LiliumVPN — {plan['name']}",
-        description=f"{plan['days']} дней · {'Безлимит' if plan['traffic_gb']==-1 else f\"{plan['traffic_gb']} ГБ\"} · {plan['devices']} уст.",
+        description=f"{plan['days']} дней · {traffic_short} · {plan['devices']} уст.",
         payload=f"vpn_{plan_key}_{call.from_user.id}",
         currency="XTR",
         prices=[LabeledPrice(label=plan["name"], amount=plan["price_stars"])],
